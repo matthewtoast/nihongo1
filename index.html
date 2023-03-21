@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charSet="utf-8">
+    <title>nihongo</title>
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no" name="viewport" >
+    <link rel="stylesheeet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <style>
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+      body, html {
+        padding: 0;
+        margin: 0;
+        color: white;
+        background-color: #112;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        text-align: center;
+      }
+      button, div, select, option {
+        font-size: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="col">
+      <div id="one">-</div>
+      <div id="two">-</div>
+      <select id="select">
+        <option value="">Choose section</option>
+      </select>
+      <button id="button" style="background-color: cyan;">
+        start
+      </button>
+    </div>
+    <script>
+      const query = unserialize(window.location.search.slice(1))
+      console.info(query)
+
+      function unserialize(str) {
+        str = decodeURIComponent(str);
+        var chunks = str.split('&'), obj = {};
+        for(var c = 0; c < chunks.length; c++) {
+          var split = chunks[c].split('=', 2);
+          const key = split[0]
+          const value = split[1];
+          if (key && value) {
+            obj[key] = value
+          }
+        }
+        return obj;
+      }
+
+      function shuffle(array) {
+        let currentIndex = array.length,  randomIndex;
+        while (currentIndex != 0) {
+          randomIndex = Math.floor(Math.random() * currentIndex);
+          currentIndex--;
+          [array[currentIndex], array[randomIndex]] = [
+            array[randomIndex], array[currentIndex]];
+        }
+        return array;
+      }
+
+      function el(id) {
+        return document.getElementById(id)
+      }
+
+      function say(text, lang = EN) {
+        const voice = speechSynthesis.getVoices().find((v) => v.lang === lang)
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = lang
+        utterance.voice = voice
+        utterance.rate = lang === JA ? 0.7 : 0.8
+        utterance.volume = lang === JA ? 1 : 0.7
+        window.speechSynthesis.speak(utterance)
+        console.info('said', utterance)
+      }
+
+      async function wait(ms) {
+        return new Promise((resolve) => {
+          setTimeout(resolve, ms);
+        })
+      }
+
+      const EN = 'en-US'
+      const JA = 'ja-JP'
+      const NONE = '-'
+
+      const datas = {}
+      let going = false
+      let section = ''
+
+      el('select').addEventListener('change', () => {
+        section = el('select').value
+      })
+
+      speechSynthesis.addEventListener("voiceschanged", async () => {
+        Object.assign(datas, {
+          ...(await (await fetch('./words.json')).json())
+        })
+        const options = Object.keys(datas).map((k) => `<option value="${k}">${k}</option>`)
+        el('select').innerHTML += options
+        el('button').addEventListener('click', onStart)
+      })
+
+      async function onStop() {
+        el('button').removeEventListener('click', onStop)
+        el('button').addEventListener('click', onStart)
+        el('button').textContent = 'start'
+        going = false
+      }
+
+      async function onStart() {
+        el('button').removeEventListener('click', onStart)
+        el('button').addEventListener('click', onStop)
+        el('button').textContent = 'stop'
+        going = true
+        const pairs = [...(datas[section] ?? [])]
+        while (going && pairs.length > 0) {
+          const [ja, en] = pairs.shift()
+          el('one').textContent = en
+          say(en, EN)
+          await wait(1000 + 100 * en.length)
+          el('two').textContent = ja
+          say(ja, JA)
+          await wait(1000 + 100 * ja.length)
+          el('one').textContent = NONE
+          el('two').textContent = NONE
+        }
+      }
+    </script>
+  </body>
+</html>
